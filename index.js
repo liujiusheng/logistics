@@ -1,6 +1,7 @@
 const xlsx = require('xlsx');
 const fs = require("fs");
 const http = require("http");
+const lib =  require('./lib.js');
 /**
  * 规定横向为x轴，纵向为y轴
  * 假设整区域为9*5的网络，
@@ -13,11 +14,12 @@ const cupboard = JSON.parse(fs.readFileSync('cupboard.json',{encoding:'utf-8'}))
 // 订单
 const order = JSON.parse(fs.readFileSync('order.json',{encoding:'utf-8'}));
 
-let workers = [false,false,false,false,false,false]; // 工人工作状态，空闲状态的将被分配订单,暂定6个工人
+let workers = JSON.parse(fs.readFileSync('worker.json',{encoding:'utf-8'})); // 工人工作状态，空闲状态的将被分配订单,暂定6个工人
 let robots = [];// 机器人数量可以无限增加，以使用的最大机器人数量为本题的结果。一个正在执行的任务就是一个机器人。不需要同时存在机器人和任务两个对象。
 const maxRobots = 6;//最多使用6台机器人
 let num = 0;//随机挑选分拣人员次数,只有6个工作台，最多执行6次
-
+let map = new Array(45);
+let timeCost = 0;//花费的总时间
 
 // 通过定时器模拟下单
 setInterval(departmentOrder,1000);
@@ -26,7 +28,7 @@ setInterval(departmentOrder,1000);
 // 任务执行
 setInterval(function(){
     // console.log('每秒执行任务');
-    let map = new Array(45);
+    
     map.fill(0);
     // 还需要把货架占用的地方和分拣占用的地方排除出去
     map.splice(0,9,1,1,1,1,1,1,1,1,1);//充电桩
@@ -35,62 +37,68 @@ setInterval(function(){
         map.splice((i*9+7),2,1,1);//货架
     }
     
-    // console.log(map);
+    console.log('当前工作机器人数：'+robots.length+',货柜：'+robots[0].cupboard+'，分拣台：'+robots[0].worker+'，充电桩：'+robots[0].position+',当前位置：'+robots[0].route+'，当前状态：'+robots[0].state);
     for(const i in robots){
-        // console.log(robots[i].route,robots[i].cupboard);
-        // 如果预计下一步被占用，则换一个方向
-        let route = robots[i].route.split('-');
-        route= [parseInt(route[0]),parseInt(route[1])];
-        let cupboard = robots[i].cupboard.split('-');
-        routecupboard= [parseInt(cupboard[0]),parseInt(cupboard[1])];
-
+        let nextPoi = lib.nextStep(i,'x',robots);
         
-        let nextPoi = [];
-        //去往货柜
-        if(robots[i].state==1){
-            //先计算x方向,x到相等了就只能计算y方向了
-            if(route[0]<cupboard[0]){
-                nextPoi = [route[0]+1,route[1]];
-            }else if(route[0]>cupboard[0]){
-                nextPoi = [route[0]-1,route[1]];
+        if(check(i,'x',nextPoi)){
+            //如果没被占用，则标记下一个点被占用，同时移动自身位置
+            
+        }else{
+            nextPoi = lib.nextStep(i,'y',robots);
+            if(check(i,'y',nextPoi)){
+                //如果没被占用，则标记下一个点被占用，同时移动自身位置
             }else{
-                //y方向
-                if(route[1]<cupboard[1]){
-                    nextPoi = [route[0],route[1]+1];
-                }else if(route[1]>cupboard[1]){
-                    nextPoi = [route[0],route[1]-1];
-                }else{
-                    // xy都相等了就是到了，从此开始下一阶段，即运往分拣台。
-                    robots[i].state = 2;
-                }
+                // 如果换一个方向还是被点用，则等待
             }
-        }else if(robots[i].state==2){
-            // 去往分拣台
-
-        }else if(robots[i].state==3){
-            // 送返货柜
-
-        }else if(robots[i].state==4){
-            // 回到充电区
-
         }
-        
-        console.log(nextPoi);
-
-        
-        // if(){
-        //     // 如果换一个方向还是被点用，则等待
-        //     if(){
-
-        //     }else{
-        //         //如果没被占用，则标记下一个点被占用，同时移动自身位置
-        //     }
-        // }else{
-        //     //如果没被占用，则标记下一个点被占用，同时移动自身位置
-        // }   
     }
-    
+    timeCost ++;
+    console.log('花费时间：'+timeCost+'秒');
 },1000);
+
+
+
+
+// 检查是否可以走下一步，不行则换方向或者暂停,可以返回true,被占用返回false
+function check(i,direction,nextPoi){
+    const index = nextPoi[0]+nextPoi[1]*9;
+    const nextPath = nextPoi[0]+'-'+nextPoi[1];
+    if(map[index]==0){
+        map[index] = 1;// 标注占用
+        // 修改机器人位置
+        robots[i].route = nextPath
+        return true;
+    }else{
+        //如果有东西占用则要判断下一步是不是目标点,目标点分别有：前往柜子，送还柜子，分拣台，充电桩
+        if(robots[i].state==1&&nextPath==robots[i].cupboard){
+            map[index] = 1;// 标注占用
+            // 修改机器人位置
+            robots[i].route = nextPath
+            return true;
+        }else if(robots[i].state==2&&nextPath==robots[i].worker){
+            map[index] = 1;// 标注占用
+            // 修改机器人位置
+            robots[i].route = nextPath;
+            workers[robots[i].workerIndex].state = false;// 分拣员重新恢复空闲状态
+            return true;
+        }else if(robots[i].state==3&&nextPath==robots[i].cupboard){
+            map[index] = 1;// 标注占用
+            // 修改机器人位置
+            robots[i].route = nextPath;
+            cupboard[robots[i].cupboard].state = false;// 柜子重新恢复空闲状态
+            return true;
+        }else if(robots[i].state==4&&nextPath==robots[i].position){
+            map[index] = 1;// 标注占用
+            // 修改机器人位置
+            robots[i].route = nextPath;
+            robots.splice(i,1);//机器人回到了充电桩，移除任务
+            return true;
+        }
+        return false;
+    }
+}
+
 
 // fs.writeFileSync(outputpath,JSON.stringify(newContent));
 
@@ -120,14 +128,15 @@ function departmentOrder(){
 // 挑选订单分拣人员
 function chooseWorker(){
     num ++;
-    if(num>6){
+    if(num>4){
         return false;
     }else{
-        let index = Math.floor(Math.random()*5);
-        if(workers[index]){
+        let index = Math.floor(Math.random()*3);
+
+        if(workers[index].state){
             return chooseWorker();
         }else{
-            workers[index] = true;//分拣完成后需要把它重新设置为false
+            workers[index].state = true;//分拣完成后需要把它重新设置为false
             return index;
         }
     }
@@ -159,10 +168,10 @@ function chooseCupboard(orderIndex){
 
 // 选择机器人,当机器人不够时可自动增加,有上限
 // 0:空闲，1:前往货柜，2:前往分拣台，3:送回货柜，4:回到充电区
-function chooseRobot(worker,orderIndex,cupboard){
+function chooseRobot(workerIndex,orderIndex,cupboard){
     const currentOrder = JSON.parse(JSON.stringify(order[orderIndex]));
     if(robots.length<1){
-        robots.push({"state":1,"worker":worker,"order":currentOrder,"cupboard":cupboard,"position":"1-0","route":"1-0"});
+        robots.push({"state":1,"worker":workers[workerIndex]['place'],"workerIndex":workerIndex,"order":currentOrder,"cupboard":cupboard,"position":"1-0","route":"1-0"});
         return true;
     }else{
         let has = false;
@@ -176,7 +185,8 @@ function chooseRobot(worker,orderIndex,cupboard){
         // 有空机器则不加机器，后续可以增加这里的添加机器条件
         if(has){
             robots[index].state = 1; 
-            robots[index].worker = worker; 
+            robots[index].worker = workers[workerIndex]['place']
+            robots[index].workerIndex = workerIndex; 
             robots[index].order = currentOrder; 
             robots[index].cupboard = cupboard;
             return true;
@@ -184,7 +194,7 @@ function chooseRobot(worker,orderIndex,cupboard){
             if(maxRobots<robots.length||maxRobots==robots.length){
                 return false;
             }else{
-                robots.push({"state":1,"worker":worker,"order":currentOrder,"cupboard":cupboard,"position":robots.length+"-0","route":robots.length+"-0"});
+                robots.push({"state":1,"worker":workers[workerIndex]['place'],"workerIndex":workerIndex,"order":currentOrder,"cupboard":cupboard,"position":robots.length+"-0","route":robots.length+"-0"});
                 return true;
             }
         }
