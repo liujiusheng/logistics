@@ -83,7 +83,7 @@ function caculateX(i,robots,route,cupboard,state){
             // xy都相等了就是到了，从此开始下一阶段，即运往分拣台。
             robots[i].state = state;
         }
-    }
+    }//console.log('有没有计算x：',route,cupboard,nextPoi);
     return nextPoi;
 }
 
@@ -99,6 +99,7 @@ function caculateX(i,robots,route,cupboard,state){
 function caculateY(i,robots,route,cupboard,state){
     let nextPoi = [];
     //y方向,y到相等了就只能计算x方向了
+    
     if(route[1]<cupboard[1]){
         nextPoi = [route[0],route[1]+1];
     }else if(route[1]>cupboard[1]){
@@ -114,5 +115,6 @@ function caculateY(i,robots,route,cupboard,state){
             robots[i].state = state;
         }
     }
+    
     return nextPoi;
 }

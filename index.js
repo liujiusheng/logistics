@@ -56,15 +56,24 @@ setInterval(function(){
     let sss =0;
     for(let i=3; i<43; i=i+3){
         for(let k=0;k<8;k++){
+            
             map.splice((i*64+19+k),5,1,1,1,1,1);//散货架
-            // map.splice(((i+1)*64+19+k),5,1,1,1,1,1);//散货架
+            map.splice(((i+1)*64+19+k),5,1,1,1,1,1);//散货架
         }
     }
     // console.log(map);
     for(let i=45; i<55; i++){
         map.splice((i*64+19),44,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1);//整货架，全部填充
     }
-    console.log('每一组数据输出：',map[64]);
+
+    // 上一次机器人的位置也需要填充，不然多个机器人可能跑到同一位置
+    for(const i in robots){
+        let route = robots[i].route.split('-');
+        const index = parseInt(route[0])+parseInt(route[1])*64;
+        map.splice(index,1,1);
+    }
+    // fs.writeFileSync('map2.json',JSON.stringify(map));
+    console.log('每一组数据输出：');
     for(const i in robots){
         console.log('当前工作机器人数：'+robots.length+',货柜：'+robots[i].cupboard+'，分拣台：'+robots[i].worker+'，充电桩：'+robots[i].position+',当前位置：'+robots[i].route+'，当前状态：'+robots[i].state);
     }
@@ -96,14 +105,19 @@ function check(i,direction,nextPoi){
     const nextPath = nextPoi[0]+'-'+nextPoi[1];//console.log(map[index]);
     const workerXY = robots[i].worker.split('-');
     const cupboardXY = robots[i].cupboard.split('-');
+    const positionXY = robots[i].position.split('-');
     // 机器人在运往分拣台时不能到分拣台同一x或小于x，因为分拣台实际是由4个点组成
     // 送返货柜时y轴需要选进入货柜前后的区域再移动x轴
+    
     if(map[index]==0){
+        // console.log('计算',robots[i].state,nextPoi[0],positionXY,cupboardXY,robots[i].state==3&&(nextPoi[0]>19||nextPoi[0]==19)&&!(positionXY[1]==parseInt(cupboardXY[1])+1||positionXY[1]==parseInt(cupboardXY[1])-1));
         if(robots[i].state==2&&(nextPoi[0]<workerXY[0]||nextPoi[0]==workerXY[0])){
             return false;
-        }else if(robots[i].state==3&&(nextPoi[0]>19||nextPoi[0]==19)&&(nextPoi[0]!=cupboardXY[1]||nextPoi[0]!=cupboardXY[1]+1||nextPoi[0]!=cupboardXY[1]-1)){
+        }
+        else if(robots[i].state==3&&(nextPoi[0]>19||nextPoi[0]==19)&&!(positionXY[1]==parseInt(cupboardXY[1])+1||positionXY[1]==parseInt(cupboardXY[1])-1)){
             return false;
-        }else{
+        }
+        else{
             map[index] = 1;// 标注占用
             // 修改机器人位置
             robots[i].route = nextPath
@@ -140,7 +154,7 @@ function check(i,direction,nextPoi){
 }
 
 
-// fs.writeFileSync(outputpath,JSON.stringify(newContent));
+
 
 function departmentOrder(){
     if(order.length<1){
@@ -213,7 +227,7 @@ function chooseRobot(workerIndex,orderIndex,cupboard){
     if(robots.length<1){
         robots.push({"state":1,"worker":workers[workerIndex]['place'],"workerIndex":workerIndex,"order":currentOrder,"cupboard":cupboard,"position":"0-0","route":"0-0"});
         return true;
-    }else{return;
+    }else{//return;
         let has = false;
         let index = null;
         for(const i in robots){
