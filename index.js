@@ -10,15 +10,32 @@ const lib =  require('./lib.js');
 // 所有货物
 const goods = JSON.parse(fs.readFileSync('goods.json',{encoding:'utf-8'}));
 // 所有货架
-const cupboard = JSON.parse(fs.readFileSync('cupboard.json',{encoding:'utf-8'}));
+// const cupboard = JSON.parse(fs.readFileSync('cupboard.json',{encoding:'utf-8'}));
+let cupboard = {};
+for(let i=0;i<15;i++){
+    for(let k=0;k<7;k++){
+    
+    }
+}
+for(let i=3; i<43; i=i+3){
+    for(let k=0;k<8;k++){
+        cupboard[(19+k*6)+'-'+i] = {"state":false,"goods":[0,1,2,3,4,5,6]};
+        cupboard[(20+k*6)+'-'+i] = {"state":false,"goods":[0,1,2,3,4,5,6]};
+        cupboard[(21+k*6)+'-'+i] = {"state":false,"goods":[0,1,2,3,4,5,6]};
+        cupboard[(22+k*6)+'-'+i] = {"state":false,"goods":[0,1,2,3,4,5,6]};
+        cupboard[(23+k*6)+'-'+i] = {"state":false,"goods":[0,1,2,3,4,5,6]};
+    }
+}
+// console.log(cupboard);
+// return;
 // 订单
 const order = JSON.parse(fs.readFileSync('order.json',{encoding:'utf-8'}));
 
 let workers = JSON.parse(fs.readFileSync('worker.json',{encoding:'utf-8'})); // 工人工作状态，空闲状态的将被分配订单,暂定6个工人
 let robots = [];// 机器人数量可以无限增加，以使用的最大机器人数量为本题的结果。一个正在执行的任务就是一个机器人。不需要同时存在机器人和任务两个对象。
-const maxRobots = 6;//最多使用6台机器人
+const maxRobots = 17;//最多使用6台机器人
 let num = 0;//随机挑选分拣人员次数,只有6个工作台，最多执行6次
-let map = new Array(45);
+let map = new Array(3520);
 let timeCost = 0;//花费的总时间
 
 // 通过定时器模拟下单
@@ -31,13 +48,26 @@ setInterval(function(){
     
     map.fill(0);
     // 还需要把货架占用的地方和分拣占用的地方排除出去
-    map.splice(0,9,1,1,1,1,1,1,1,1,1);//充电桩
-    for(let i=1; i<5; i++){
-        map.splice((i*9),1,1);//分拣台
-        map.splice((i*9+7),2,1,1);//货架
+    map.splice(0,17,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1);//充电桩
+    for(let i=0; i<7; i++){
+        map.splice(((i*5+15)*64+13),2,1,1);//分拣台
+        map.splice(((i*5+16)*64+13),2,1,1);//分拣台
     }
-    
-    console.log('当前工作机器人数：'+robots.length+',货柜：'+robots[0].cupboard+'，分拣台：'+robots[0].worker+'，充电桩：'+robots[0].position+',当前位置：'+robots[0].route+'，当前状态：'+robots[0].state);
+    let sss =0;
+    for(let i=3; i<43; i=i+3){
+        for(let k=0;k<8;k++){
+            map.splice((i*64+19+k),5,1,1,1,1,1);//散货架
+            // map.splice(((i+1)*64+19+k),5,1,1,1,1,1);//散货架
+        }
+    }
+    // console.log(map);
+    for(let i=45; i<55; i++){
+        map.splice((i*64+19),44,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1);//整货架，全部填充
+    }
+    console.log('每一组数据输出：',map[64]);
+    for(const i in robots){
+        console.log('当前工作机器人数：'+robots.length+',货柜：'+robots[i].cupboard+'，分拣台：'+robots[i].worker+'，充电桩：'+robots[i].position+',当前位置：'+robots[i].route+'，当前状态：'+robots[i].state);
+    }
     for(const i in robots){
         let nextPoi = lib.nextStep(i,'x',robots);
         
@@ -62,13 +92,23 @@ setInterval(function(){
 
 // 检查是否可以走下一步，不行则换方向或者暂停,可以返回true,被占用返回false
 function check(i,direction,nextPoi){
-    const index = nextPoi[0]+nextPoi[1]*9;
-    const nextPath = nextPoi[0]+'-'+nextPoi[1];
+    const index = nextPoi[0]+nextPoi[1]*64;
+    const nextPath = nextPoi[0]+'-'+nextPoi[1];//console.log(map[index]);
+    const workerXY = robots[i].worker.split('-');
+    const cupboardXY = robots[i].cupboard.split('-');
+    // 机器人在运往分拣台时不能到分拣台同一x或小于x，因为分拣台实际是由4个点组成
+    // 送返货柜时y轴需要选进入货柜前后的区域再移动x轴
     if(map[index]==0){
-        map[index] = 1;// 标注占用
-        // 修改机器人位置
-        robots[i].route = nextPath
-        return true;
+        if(robots[i].state==2&&(nextPoi[0]<workerXY[0]||nextPoi[0]==workerXY[0])){
+            return false;
+        }else if(robots[i].state==3&&(nextPoi[0]>19||nextPoi[0]==19)&&(nextPoi[0]!=cupboardXY[1]||nextPoi[0]!=cupboardXY[1]+1||nextPoi[0]!=cupboardXY[1]-1)){
+            return false;
+        }else{
+            map[index] = 1;// 标注占用
+            // 修改机器人位置
+            robots[i].route = nextPath
+            return true;
+        }
     }else{
         //如果有东西占用则要判断下一步是不是目标点,目标点分别有：前往柜子，送还柜子，分拣台，充电桩
         if(robots[i].state==1&&nextPath==robots[i].cupboard){
@@ -128,10 +168,10 @@ function departmentOrder(){
 // 挑选订单分拣人员
 function chooseWorker(){
     num ++;
-    if(num>4){
+    if(num>6){
         return false;
     }else{
-        let index = Math.floor(Math.random()*3);
+        let index = Math.floor(Math.random()*6);//最多6个分拣台同时工作
 
         if(workers[index].state){
             return chooseWorker();
@@ -171,9 +211,9 @@ function chooseCupboard(orderIndex){
 function chooseRobot(workerIndex,orderIndex,cupboard){
     const currentOrder = JSON.parse(JSON.stringify(order[orderIndex]));
     if(robots.length<1){
-        robots.push({"state":1,"worker":workers[workerIndex]['place'],"workerIndex":workerIndex,"order":currentOrder,"cupboard":cupboard,"position":"1-0","route":"1-0"});
+        robots.push({"state":1,"worker":workers[workerIndex]['place'],"workerIndex":workerIndex,"order":currentOrder,"cupboard":cupboard,"position":"0-0","route":"0-0"});
         return true;
-    }else{
+    }else{return;
         let has = false;
         let index = null;
         for(const i in robots){
